@@ -1,0 +1,28 @@
+services:
+  app:
+    image: mosogrean/trello-telegram-noti:v1.0.0
+    container_name: trello-telegram-noti
+    restart: unless-stopped
+    ports:
+      - "${PUBLISHED_PORT:-7000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      DB_PATH: /app/data/database.sqlite
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-user01}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/webhook/trello"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sqlite_data:
+    driver: local

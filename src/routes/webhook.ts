@@ -133,6 +133,11 @@ router.post('/trello', async (req: Request, res: Response): Promise<void> => {
 function queueTrelloNotification(action: TrelloAction, board: BoardRow, bots: BotRow[]): void {
   const actionId = action.id;
   if (!actionId) {
+    if (!shouldSendTrelloNotification(action)) {
+      console.log(`[webhook] Skipping unsupported Trello action: ${action.type}`);
+      return;
+    }
+
     sendNotification(action, board, bots).catch((err) => {
       console.error('[webhook] Failed to send Trello notification:', err);
     });
@@ -153,6 +158,12 @@ function queueTrelloNotification(action: TrelloAction, board: BoardRow, bots: Bo
   const timer = setTimeout(() => {
     pendingNotifications.delete(actionId);
     markActionAsSent(actionId);
+
+    if (!shouldSendTrelloNotification(selectedAction)) {
+      console.log(`[webhook] Skipping unsupported Trello action: ${selectedAction.type}`);
+      return;
+    }
+
     sendNotification(selectedAction, board, bots).catch((err) => {
       console.error('[webhook] Failed to send Trello notification:', err);
     });
@@ -178,6 +189,12 @@ function chooseNotificationAction(
 
 function isMoveCardAction(action: TrelloAction): boolean {
   return Boolean(action.data?.listBefore?.name && action.data?.listAfter?.name);
+}
+
+function shouldSendTrelloNotification(action: TrelloAction): boolean {
+  // Temporarily only notify card creation and card moves.
+  // Other action formatters are kept in telegramService for later re-enable.
+  return action.type === 'createCard' || (action.type === 'updateCard' && isMoveCardAction(action));
 }
 
 function markActionAsSent(actionId: string): void {
