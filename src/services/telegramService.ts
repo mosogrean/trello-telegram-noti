@@ -112,7 +112,7 @@ export async function sendTrelloNotification(
   };
 
   const { description, cardUrl, cardNumber } = formatTrelloNotification(action, boardName);
-  const emoji = isDoneMoveAction(action) ? '🎉' : actionEmoji[action.type] || actionEmoji['default'];
+  const emoji = getMoveListStatus(action)?.emoji || actionEmoji[action.type] || actionEmoji['default'];
   let message = `${emoji} ${description}`;
   if (cardUrl) {
     message += `\n\n🔗 <a href="${escapeHtml(cardUrl)}">เปิดใน Trello</a>`;
@@ -139,7 +139,8 @@ function formatTrelloNotification(
   const text = action.data?.text;
   const member = getEntityText(action, 'member') || action.data?.member?.username || 'Unknown member';
   const cardUrl = getCardUrl(action);
-  const doneMove = isDoneMoveAction(action);
+  const moveListStatus = getMoveListStatus(action);
+  const doneMove = moveListStatus?.key === 'done';
   const cardNumber = getCardNumberLine(action, cardUrl, doneMove);
   const cardLines = buildCardMessageLines({ board, card, cardDesc, cardLabels, who });
 
@@ -158,9 +159,9 @@ function formatTrelloNotification(
         return {
           description: [
             ...cardLines,
-            doneMove ? `🎊 ดีใจด้วย! งานนี้เสร็จแล้ว ย้ายการ์ดไป <b>${escapeHtml(listAfter)}</b>` : `🚚 รายการ: ย้ายการ์ด`,
+            `🚚 รายการ: ย้ายการ์ด`,
             `📍 จาก: <b>${escapeHtml(listBefore)}</b>`,
-            `➡️ ไป: <b>${escapeHtml(listAfter)}</b>`,
+            formatMoveDestinationLine(listAfter, moveListStatus),
           ].join('\n'),
           cardUrl,
           cardNumber,
@@ -306,9 +307,27 @@ function getCardNumberLine(
   return `<b>🔢 เลขการ์ด:</b> ${linkedCardNumber}`;
 }
 
-function isDoneMoveAction(action: TrelloAction): boolean {
+function formatMoveDestinationLine(
+  listAfter: string,
+  moveListStatus?: { key: string; emoji: string; suffix: string }
+): string {
+  if (!moveListStatus) return `➡️ ไป: <b>${escapeHtml(listAfter)}</b>`;
+  const suffix = moveListStatus.suffix ? ` ${moveListStatus.suffix}` : '';
+  return `${moveListStatus.emoji} ไป: <b>${escapeHtml(listAfter)}</b>${suffix}`;
+}
+
+function getMoveListStatus(action: TrelloAction): { key: string; emoji: string; suffix: string } | undefined {
   const listAfter = action.data?.listAfter?.name;
-  return Boolean(action.data?.listBefore?.name && listAfter && listAfter.trim().toLowerCase() === 'done');
+  if (!action.data?.listBefore?.name || !listAfter) return undefined;
+
+  switch (listAfter.trim().toLowerCase()) {
+    case 'done':
+      return { key: 'done', emoji: '🎊', suffix: '✅' };
+    case 'doing':
+      return { key: 'doing', emoji: '🔨', suffix: '' };
+    default:
+      return undefined;
+  }
 }
 
 function buildCardMessageLines({

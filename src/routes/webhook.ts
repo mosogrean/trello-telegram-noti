@@ -220,7 +220,6 @@ async function enrichActionCard(
   const cardDetails = await getTrelloCardDetails(cardId, apiKey, token);
   if (!cardDetails) return action;
 
-  console.log(JSON.stringify(cardDetails));
   return {
     ...action,
     data: {
