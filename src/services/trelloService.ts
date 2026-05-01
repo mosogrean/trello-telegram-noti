@@ -2,17 +2,48 @@ import https from 'https';
 import http from 'http';
 
 export interface TrelloAction {
+  id?: string;
   type: string;
   data: {
-    card?: { name: string; shortUrl?: string; id?: string };
-    list?: { name: string };
-    listBefore?: { name: string };
-    listAfter?: { name: string };
-    board?: { name: string };
+    card?: {
+      name?: string;
+      desc?: string;
+      shortUrl?: string;
+      shortLink?: string;
+      id?: string;
+      idShort?: number;
+      labels?: Array<{ name?: string; color?: string }>;
+    };
+    list?: { name?: string };
+    listBefore?: { name?: string };
+    listAfter?: { name?: string };
+    board?: { name?: string };
     text?: string;
-    member?: { fullName: string };
+    member?: { fullName?: string; username?: string };
   };
-  memberCreator?: { fullName: string; username: string };
+  display?: {
+    translationKey?: string;
+    entities?: Record<
+      string,
+      {
+        type?: string;
+        text?: string;
+        username?: string;
+        shortLink?: string;
+        id?: string;
+      }
+    >;
+  };
+  memberCreator?: { fullName?: string; username?: string };
+}
+
+export interface TrelloCardDetails {
+  name?: string;
+  desc?: string;
+  shortUrl?: string;
+  shortLink?: string;
+  idShort?: number;
+  labels?: Array<{ name?: string; color?: string }>;
 }
 
 export function describeAction(action: TrelloAction): string {
@@ -89,6 +120,43 @@ export async function getTrelloBoardInfo(
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data) as { id: string; name: string };
+            resolve(parsed);
+          } catch {
+            resolve(null);
+          }
+        });
+      })
+      .on('error', () => resolve(null));
+  });
+}
+
+export async function getTrelloCardDetails(
+  cardId: string,
+  apiKey: string,
+  token: string
+): Promise<TrelloCardDetails | null> {
+  return new Promise((resolve) => {
+    const params = new URLSearchParams({
+      key: apiKey,
+      token,
+      fields: 'name,desc,idShort,shortUrl,shortLink,labels',
+      labels: 'all',
+      label_fields: 'name,color',
+    });
+    const url = `https://api.trello.com/1/cards/${encodeURIComponent(cardId)}?${params.toString()}`;
+
+    https
+      .get(url, (res) => {
+        if (res.statusCode !== 200) {
+          resolve(null);
+          return;
+        }
+
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data) as TrelloCardDetails;
             resolve(parsed);
           } catch {
             resolve(null);
